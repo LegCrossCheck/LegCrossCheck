@@ -1,0 +1,125 @@
+(kicad_sch
+	(version 20260306)
+	(generator "eeschema")
+	(generator_version "10.0")
+	(uuid "7c631eba-18f8-4e61-a20f-0a977fba4e35")
+	(paper "A4")
+	(title_block
+		(title "CrossCheck - breadboard wiring (2 nodes)")
+		(date "2026-10-30")
+		(rev "2")
+		(company "CS 437 FA26")
+		(comment 1 "Hierarchical: open Node A / Node B sheets")
+		(comment 2 "Breadboard only - no footprints assigned")
+	)
+	(lib_symbols)
+	(text "CrossCheck - ankle-worn leg-crossing / leg-bouncing wearable (CS 437 FA26)\n\nNode A (emitter ankle): Feather ESP32-S3, 9DoF IMU,\n  940 nm IR LED with 3 drive levels, magnet, vibration motor.\nNode B (receiver ankle): Feather ESP32-S3, 9DoF IMU (magnetometer),\n  TSSP77038 + TSOP38238 IR receivers, DRV5032 hall switch, vibration motor.\nNodes talk over ESP-NOW - there are no wires between them.\n\nPin map            Node A              Node B\n  D5               IMU INT1            IMU INT1\n  D6               -                   hall switch\n  D9               IR drive LO         TSSP77038 out\n  D10              IR drive MID        TSOP38238 out\n  D11              IR drive HI         -\n  D12              motor driver        motor driver\n\nBreadboard / proof-of-concept wiring only. Net labels with the\nsame name on a sheet are connected."
+		(exclude_from_sim no)
+		(at 25.4 88.9 0)
+		(effects
+			(font
+				(size 1.524 1.524)
+			)
+			(justify left bottom)
+		)
+		(uuid "935446b5-cbdf-444a-968e-b5cc29929601")
+	)
+	(sheet
+		(at 25.4 38.1)
+		(size 76.2 30.48)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0)
+		)
+		(uuid "b9e31745-628c-437b-8e2b-7d7f8045c82e")
+		(property "Sheetname" "Node A"
+			(at 25.4 37.3884 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "node_a.kicad_sch"
+			(at 25.4 69.1646 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "legsen_breadboard"
+				(path "/7c631eba-18f8-4e61-a20f-0a977fba4e35"
+					(page "2")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 127 38.1)
+		(size 76.2 30.48)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0)
+		)
+		(uuid "e24b4400-5cbb-4f11-a95a-f1b93c7700e8")
+		(property "Sheetname" "Node B"
+			(at 127 37.3884 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "node_b.kicad_sch"
+			(at 127 69.1646 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "legsen_breadboard"
+				(path "/7c631eba-18f8-4e61-a20f-0a977fba4e35"
+					(page "3")
+				)
+			)
+		)
+	)
+	(sheet_instances
+		(path "/"
+			(page "1")
+		)
+	)
+	(embedded_fonts no)
+)

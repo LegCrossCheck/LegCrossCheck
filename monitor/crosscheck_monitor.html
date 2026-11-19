@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CrossCheck 监视台</title>
+<style>
+:root {
+  --bg: #e6eaed; --panel: #f6f8f9; --line: #c9d1d8; --ink: #1b242d; --dim: #5d6b78;
+  --idle: #2a6bdc; --hit: #d42f3c; --ok: #1d8a5b; --warn: #b26a00;
+  --x: #b7791f; --y: #0f8a7a; --z: #6b4fd8; --grid: #dde3e8;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #11161b; --panel: #192028; --line: #2c3742; --ink: #dce4ec; --dim: #8c9aa8;
+    --idle: #5b93f5; --hit: #f0525e; --ok: #45c08a; --warn: #e0a040;
+    --x: #e0a848; --y: #3cc4b2; --z: #9d86f5; --grid: #232c35;
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font: 15px/1.5 "Avenir Next", "PingFang SC", "Helvetica Neue", "Microsoft YaHei", sans-serif;
+}
+.num { font-variant-numeric: tabular-nums; }
+header {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 14px 20px; border-bottom: 1px solid var(--line); background: var(--panel);
+}
+h1 { font-size: 18px; font-weight: 600; margin: 0 auto 0 0; letter-spacing: .01em; }
+button {
+  font: inherit; color: var(--ink); background: transparent; cursor: pointer;
+  border: 1.5px solid var(--ink); border-radius: 4px; padding: 6px 14px;
+}
+button:disabled { opacity: .4; cursor: default; }
+button:not(:disabled):hover { background: var(--ink); color: var(--panel); }
+button:focus-visible { outline: 2px solid var(--idle); outline-offset: 2px; }
+#notice {
+  display: none; margin: 14px 20px 0; padding: 10px 14px; border-left: 4px solid var(--warn);
+  background: var(--panel); font-size: 14px;
+}
+main {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 14px 20px 24px;
+  max-width: 1500px; margin: 0 auto;
+}
+@media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+.node { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.node-head { display: flex; align-items: center; gap: 12px; padding: 0 2px; }
+.node-head h2 { font-size: 20px; font-weight: 600; margin: 0; color: var(--ink); }
+.state { color: var(--dim); font-size: 14px; margin-right: auto; }
+.state.on { color: var(--ok); }
+.state.err { color: var(--hit); }
+.node-head button { padding: 3px 10px; font-size: 13px; }
+section { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; }
+h3 { font-size: 13px; font-weight: 600; margin: 0 0 8px; color: var(--dim); }
+h3 small { font-weight: 400; margin-left: 6px; }
+
+.ir { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.lamp {
+  width: 52px; height: 52px; border-radius: 50%; flex: none;
+  background: var(--line); border: 3px solid var(--panel); outline: 1px solid var(--line);
+}
+.lamp.idle { background: var(--idle); }
+.lamp.seen { background: var(--hit); box-shadow: 0 0 20px var(--hit); }
+.lamp-text { font-size: 18px; font-weight: 600; min-width: 7.5em; }
+.ir dl { flex: 1; min-width: 200px; }
+dl { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; margin: 0; font-size: 14px; }
+dt { color: var(--dim); }
+dd { margin: 0; text-align: right; }
+
+.trio { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+@media (max-width: 520px) { .trio { grid-template-columns: 1fr; } }
+.big { font-size: 20px; font-weight: 600; line-height: 1.3; }
+.big small { font-size: 13px; font-weight: 400; color: var(--dim); margin-left: 3px; }
+.missing { color: var(--warn); font-size: 13px; display: none; margin: 0 0 6px; }
+.off .missing { display: block; }
+.off .live { opacity: .35; }
+
+.strip { margin-bottom: 10px; }
+.strip:last-child { margin-bottom: 0; }
+.strip-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 14px; font-size: 14px; }
+.strip-head b { font-weight: 600; min-width: 5.5em; }
+.strip-head span { min-width: 5.6em; }
+.strip-head i { font-style: normal; }
+.kx { color: var(--x); } .ky { color: var(--y); } .kz { color: var(--z); }
+canvas { display: block; width: 100%; height: 100px; margin-top: 4px; border: 1px solid var(--grid); border-radius: 3px; }
+.log {
+  margin: 0; max-height: 90px; overflow: auto; font: 12px/1.5 ui-monospace, Menlo, Consolas, monospace;
+  color: var(--dim); white-space: pre-wrap; word-break: break-all;
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>CrossCheck 监视台</h1>
+  <button id="rec">开始录制</button>
+  <button id="addBle">添加蓝牙设备</button>
+  <button id="addUsb">添加 USB 设备</button>
+</header>
+<div id="notice"></div>
+
+<main id="main"></main>
+
+<template id="tpl">
+  <div class="node">
+    <div class="node-head">
+      <h2 data-k="title"></h2>
+      <span class="state" data-k="state">未连接</span>
+      <button data-k="close" hidden>断开</button>
+    </div>
+
+    <section>
+      <h3 data-k="irTitle"></h3>
+      <div class="ir">
+        <div class="lamp" data-k="lamp"></div>
+        <div class="lamp-text" data-k="lampText">等待连接</div>
+        <dl class="num">
+          <dt data-k="rxLabel"></dt><dd><span data-k="rx">–</span> 个/秒</dd>
+          <dt>长度不符，已丢弃</dt><dd><span data-k="bad">–</span> 个/秒</dd>
+          <dt>最近一个脉冲宽度</dt><dd><span data-k="w">–</span> µs</dd>
+          <dt>自己发射</dt><dd><span data-k="tx">–</span> 个/秒</dd>
+          <dt>累计收到</dt><dd><span data-k="n">–</span></dd>
+        </dl>
+      </div>
+    </section>
+
+    <div class="trio">
+      <section data-k="secTilt">
+        <h3>倾角<small>芯片坐标轴</small></h3>
+        <p class="missing">没找到 IMU</p>
+        <dl class="num live">
+          <dt>pitch</dt><dd><span data-k="pitch">–</span>°</dd>
+          <dt>roll</dt><dd><span data-k="roll">–</span>°</dd>
+          <dt>温度</dt><dd><span data-k="tc">–</span> °C</dd>
+        </dl>
+      </section>
+      <section>
+        <h3>振动马达 D11</h3>
+        <div class="big" data-k="vib">–</div>
+        <button data-k="buzz" disabled style="margin-top:6px;padding:3px 10px;font-size:13px">震 0.4 秒</button>
+      </section>
+      <section data-k="secBat">
+        <h3>电池</h3>
+        <p class="missing">没读到电量计</p>
+        <div class="big num live"><span data-k="v">–</span><small>V</small> <span data-k="pct">–</span><small>%</small></div>
+        <div class="num live" data-k="life" style="font-size:13px;color:var(--dim)"></div>
+      </section>
+    </div>
+
+    <section data-k="secImu">
+      <h3>加速度计和陀螺仪<small>最近 5 秒，每秒 100 点</small></h3>
+      <p class="missing">没找到 LSM6DSOX（I2C 0x6A），检查 QT 线</p>
+      <div class="strip live">
+        <div class="strip-head num"><b>加速度 g</b>
+          <span class="kx">X <i data-k="ax">–</i></span><span class="ky">Y <i data-k="ay">–</i></span><span class="kz">Z <i data-k="az">–</i></span></div>
+        <canvas data-k="cAcc"></canvas>
+      </div>
+      <div class="strip live">
+        <div class="strip-head num"><b>角速度 °/s</b>
+          <span class="kx">X <i data-k="gx">–</i></span><span class="ky">Y <i data-k="gy">–</i></span><span class="kz">Z <i data-k="gz">–</i></span></div>
+        <canvas data-k="cGyr"></canvas>
+      </div>
+    </section>
+
+    <section data-k="secMag">
+      <h3>磁力计<small>磁铁靠近时 |B| 上升</small></h3>
+      <p class="missing">没找到 LIS3MDL（I2C 0x1C），检查 QT 线</p>
+      <div class="strip live">
+        <div class="strip-head num"><b>|B| <i data-k="B">–</i> µT</b>
+          <span class="kx">X <i data-k="mx">–</i></span><span class="ky">Y <i data-k="my">–</i></span><span class="kz">Z <i data-k="mz">–</i></span></div>
+        <canvas data-k="cMag"></canvas>
+      </div>
+    </section>
+
+    <section>
+      <h3>板子的其他输出</h3>
+      <pre class="log" data-k="log">启动信息和 I2C 扫描结果会显示在这里。</pre>
+    </section>
+  </div>
+</template>
+
+<script>
+const N_IMU = 500;                   // 5 s at 100 samples per second
+const N_MAG = 100;
+const NUS = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
+const NUS_TX = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
+const NUS_RX = '6e400002-b5a3-f393-e0a9-e50e24dcca9e';
+
+function notice(text) {
+  const n = document.getElementById('notice');
+  n.textContent = text; n.style.display = text ? 'block' : 'none';
+}
+
+// ---------------- one panel per node ----------------
+const panels = {};
+for (const id of ['A', 'B']) {
+  const other = id === 'A' ? 'B' : 'A';
+  const root = document.getElementById('tpl').content.firstElementChild.cloneNode(true);
+  const el = {};
+  root.querySelectorAll('[data-k]').forEach(e => { el[e.dataset.k] = e; });
+  el.title.textContent = 'Node ' + id;
+  el.irTitle.textContent = '红外：有没有收到 ' + other;
+  el.rxLabel.textContent = '收到 ' + other + ' 的脉冲';
+  document.getElementById('main').appendChild(root);
+  const p = panels[id] = {
+    id, other, el, conn: null, dirty: false, batchSeen: false,
+    lastDataAt: 0, sampleCount: 0, logLines: [],
+    hist: { acc: [[], [], []], gyr: [[], [], []], mag: [[]] }
+  };
+  el.close.addEventListener('click', () => { if (p.conn) p.conn.close(); });
+  el.buzz.addEventListener('click', () => { if (p.conn && p.conn.send) p.conn.send('v\n'); });
+}
+
+function setState(p, text, cls) { p.el.state.textContent = text; p.el.state.className = 'state ' + (cls || ''); }
+
+// ---------------- connections ----------------
+// A connection does not know which node it is until the first status line (or the
+// Bluetooth name) says so. Then it is bound to that panel.
+function bind(conn, id) {
+  const p = panels[id];
+  if (!p) return false;
+  if (p.conn && p.conn !== conn) {
+    notice('Node ' + id + ' 已经连着了，新的这个连接已断开。');
+    conn.close();
+    return false;
+  }
+  conn.node = id; p.conn = conn;
+  p.lastDataAt = 0; p.sampleCount = 0;
+  p.el.close.hidden = false;
+  p.el.buzz.disabled = !conn.send;
+  setState(p, (conn.kind === 'ble' ? '蓝牙' : 'USB') + '已连接，等待数据', 'on');
+  for (const l of conn.early) logLine(p, l);
+  conn.early = [];
+  return true;
+}
+
+function unbind(conn) {
+  conn.dead = true;
+  const p = conn.node && panels[conn.node];
+  if (!p || p.conn !== conn) return;
+  p.conn = null;
+  p.el.close.hidden = true;
+  p.el.buzz.disabled = true;
+  p.el.vib.textContent = '–'; p.el.vib.style.color = '';
+  setState(p, '未连接');
+  p.el.lamp.className = 'lamp';
+  p.el.lampText.textContent = '等待连接';
+}
+
+function feed(conn, chunk) {
+  conn.buf += chunk;
+  let i;
+  while ((i = conn.buf.indexOf('\n')) >= 0) {
+    const line = conn.buf.slice(0, i).trim();
+    conn.buf = conn.buf.slice(i + 1);
+    if (line) onLine(conn, line);
+  }
+}
+
+// ---- recording: every data line, tagged with node and computer time, saved as .jsonl ----
+let recLines = null, recStart = 0;
+const recBtn = document.getElementById('rec');
+recBtn.addEventListener('click', () => {
+  if (!recLines) { recLines = []; recStart = Date.now(); recBtn.textContent = '停止并保存 (0 秒)'; return; }
+  const blob = new Blob([recLines.join('\n') + '\n'], { type: 'application/x-ndjson' });
+  const d = new Date(recStart), z = n => String(n).padStart(2, '0');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'crosscheck_' + d.getFullYear() + z(d.getMonth() + 1) + z(d.getDate()) + '_' + z(d.getHours()) + z(d.getMinutes()) + z(d.getSeconds()) + '.jsonl';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  recLines = null; recBtn.textContent = '开始录制';
+});
+setInterval(() => { if (recLines) recBtn.textContent = '停止并保存 (' + Math.round((Date.now() - recStart) / 1000) + ' 秒)'; }, 1000);
+
+function onLine(conn, line) {
+  if (conn.dead) return;
+  if (line[0] === '{') {
+    let d;
+    try { d = JSON.parse(line); } catch (e) { return; }      // damaged line: drop it
+    if (!conn.node) {
+      if (d.node === undefined && !d.s && !conn.warned) {
+        conn.warned = true;
+        notice('这块板子的固件没有报告自己是 A 还是 B。请刷最新的 nodeA_monitor / nodeB_monitor。');
+      }
+      if (!d.node || !bind(conn, d.node)) return;
+    }
+    if (recLines) recLines.push('{"node":"' + conn.node + '","pc":' + Date.now() + ',"d":' + line + '}');
+    update(panels[conn.node], d);
+    return;
+  }
+  if (conn.node) logLine(panels[conn.node], line);
+  else if (conn.early.length < 20) conn.early.push(line);
+}
+
+function logLine(p, line) {
+  p.logLines.push(line);
+  if (p.logLines.length > 30) p.logLines.shift();
+  p.el.log.textContent = p.logLines.join('\n');
+  p.el.log.scrollTop = p.el.log.scrollHeight;
+}
+
+// ---- Bluetooth ----
+async function addBle() {
+  notice('');
+  let dev = null;
+  try {
+    dev = await navigator.bluetooth.requestDevice({
+      filters: [{ namePrefix: 'CrossCheck' }, { services: [NUS] }],
+      optionalServices: [NUS]
+    });
+    for (const id in panels) {
+      const c = panels[id].conn;
+      if (c && c.dev === dev) { notice('这块板子已经连着了（Node ' + id + '）。'); return; }
+    }
+    const conn = { kind: 'ble', dev, node: null, buf: '', early: [], dead: false,
+                   close: () => { try { dev.gatt.disconnect(); } catch (e) {} } };
+    dev.addEventListener('gattserverdisconnected', () => unbind(conn), { once: true });
+    const server = await dev.gatt.connect();
+    const svc = await server.getPrimaryService(NUS);
+    const ch = await svc.getCharacteristic(NUS_TX);
+    const dec = new TextDecoder();
+    ch.addEventListener('characteristicvaluechanged', ev => feed(conn, dec.decode(ev.target.value, { stream: true })));
+    try {
+      const rx = await svc.getCharacteristic(NUS_RX);
+      conn.send = text => {
+        const bytes = new TextEncoder().encode(text);
+        return (rx.writeValueWithoutResponse ? rx.writeValueWithoutResponse(bytes) : rx.writeValue(bytes)).catch(() => {});
+      };
+    } catch (e) {}                                           // older firmware: no command channel
+    const m = /-([AB])$/.exec(dev.name || '');
+    if (m && !bind(conn, m[1])) return;
+    await ch.startNotifications();
+  } catch (e) {
+    if (e.name === 'NotFoundError') return;                  // picker was closed
+    try { if (dev && dev.gatt.connected) dev.gatt.disconnect(); } catch (e2) {}
+    notice('蓝牙连接失败：' + e.message + '。确认板子已上电，再点一次“添加蓝牙设备”。');
+  }
+}
+
+// ---- USB serial ----
+async function addUsb() {
+  notice('');
+  let port;
+  try {
+    port = await navigator.serial.requestPort();
+    await port.open({ baudRate: 115200 });
+    await port.setSignals({ dataTerminalReady: true, requestToSend: false });
+  } catch (e) {
+    if (e.name === 'NotFoundError') return;
+    notice('端口打不开：这个端口可能已经连着，或者被 Arduino 的 Serial Monitor 占用。（' + e.message + '）');
+    return;
+  }
+  let reader = null, keep = true;
+  const writer = port.writable.getWriter();
+  const conn = { kind: 'usb', node: null, buf: '', early: [], dead: false,
+                 close: () => { keep = false; try { reader.cancel(); } catch (e) {} },
+                 send: text => writer.write(new TextEncoder().encode(text)).catch(() => {}) };
+  const dec = new TextDecoder();
+  try {
+    reader = port.readable.getReader();
+    while (keep) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      feed(conn, dec.decode(value, { stream: true }));
+    }
+  } catch (e) {
+    notice('USB 连接断了：' + e.message + '。重新插一下，再点“添加 USB 设备”。');
+  } finally {
+    try { reader.releaseLock(); } catch (e) {}
+    try { writer.releaseLock(); } catch (e) {}
+    try { await port.close(); } catch (e) {}
+    unbind(conn);
+  }
+}
+
+const hasBle = 'bluetooth' in navigator, hasUsb = 'serial' in navigator;
+document.getElementById('addBle').disabled = !hasBle;
+document.getElementById('addUsb').disabled = !hasUsb;
+if (!hasBle && !hasUsb) notice('这个浏览器不支持蓝牙和串口。请用电脑上的 Chrome 或 Edge 打开这个文件。');
+document.getElementById('addBle').addEventListener('click', addBle);
+document.getElementById('addUsb').addEventListener('click', addUsb);
+
+// ---------------- data -> panel ----------------
+function push(arr, v, cap) { arr.push(v); if (arr.length > cap) arr.shift(); }
+
+function update(p, d) {
+  const el = p.el;
+  const txt = (k, v, digits) => { el[k].textContent = digits === undefined ? v : Number(v).toFixed(digits); };
+  p.lastDataAt = performance.now();
+
+  if (d.s) {                          // batch of raw IMU samples: mg and 0.1 deg/s
+    p.batchSeen = true;
+    for (const r of d.s) {
+      for (let k = 0; k < 3; k++) { push(p.hist.acc[k], r[k] / 1000, N_IMU); push(p.hist.gyr[k], r[k + 3] / 10, N_IMU); }
+    }
+    p.sampleCount += d.s.length;
+    p.dirty = true;
+    return;
+  }
+
+  el.lamp.className = 'lamp ' + (d.seen ? 'seen' : 'idle');
+  el.lampText.textContent = d.seen ? '收到 ' + p.other + ' 的信号' : '没收到 ' + p.other;
+  txt('rx', d.rx); txt('bad', d.bad); txt('w', d.w); txt('tx', d.tx); txt('n', d.n);
+
+  el.secImu.classList.toggle('off', !d.imu);
+  el.secTilt.classList.toggle('off', !d.imu);
+  if (d.imu) {
+    txt('ax', d.a[0], 2); txt('ay', d.a[1], 2); txt('az', d.a[2], 2);
+    txt('gx', d.g[0], 0); txt('gy', d.g[1], 0); txt('gz', d.g[2], 0);
+    txt('pitch', d.pitch, 1); txt('roll', d.roll, 1); txt('tc', d.tc, 1);
+    if (!p.batchSeen) for (let k = 0; k < 3; k++) { push(p.hist.acc[k], d.a[k], N_IMU); push(p.hist.gyr[k], d.g[k], N_IMU); }
+  }
+
+  el.secMag.classList.toggle('off', !d.mag);
+  if (d.mag) {
+    txt('mx', d.m[0], 0); txt('my', d.m[1], 0); txt('mz', d.m[2], 0); txt('B', d.B, 1);
+    push(p.hist.mag[0], d.B, N_MAG);
+  }
+
+  if (d.vib === undefined) { el.vib.textContent = '固件不支持'; el.vib.style.color = ''; }
+  else { el.vib.textContent = d.vib ? '震动中' : '停止'; el.vib.style.color = d.vib ? 'var(--hit)' : ''; }
+
+  el.secBat.classList.toggle('off', !d.bat);
+  if (d.bat) {
+    txt('v', d.v, 2); txt('pct', d.pct, 0);
+    let life = '';
+    if (d.cr !== undefined) {
+      if (d.cr < -0.5) life = '耗电 ' + (-d.cr).toFixed(1) + ' %/时，约剩 ' + (d.pct / -d.cr).toFixed(1) + ' 小时';
+      else if (d.cr > 0.5) life = '充电中 +' + d.cr.toFixed(1) + ' %/时';
+      else life = '耗电速率估算中';
+    }
+    el.life.textContent = life;
+  }
+
+  p.dirty = true;
+}
+
+// ---------------- charts ----------------
+function css(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+function draw(canvas, series, colors, minSpan, zeroBased, N) {
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  if (canvas.width !== Math.round(w * dpr)) { canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr); }
+  const c = canvas.getContext('2d');
+  c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  c.clearRect(0, 0, w, h);
+
+  let lo = Infinity, hi = -Infinity;
+  for (const s of series) for (const v of s) { if (v < lo) lo = v; if (v > hi) hi = v; }
+  if (!isFinite(lo)) { lo = 0; hi = minSpan; }
+  if (zeroBased) lo = 0;
+  if (hi - lo < minSpan) { const mid = zeroBased ? minSpan / 2 : (hi + lo) / 2; lo = mid - minSpan / 2; hi = mid + minSpan / 2; }
+  const pad = (hi - lo) * 0.08; hi += pad; if (!zeroBased) lo -= pad;
+  const Y = v => h - (v - lo) / (hi - lo) * h;
+
+  c.strokeStyle = css('--grid'); c.lineWidth = 1; c.beginPath();
+  for (let i = 1; i < 4; i++) { const y = Math.round(h * i / 4) + .5; c.moveTo(0, y); c.lineTo(w, y); }
+  if (lo < 0 && hi > 0) { const y = Math.round(Y(0)) + .5; c.moveTo(0, y); c.lineTo(w, y); }
+  c.stroke();
+
+  c.fillStyle = css('--dim'); c.font = '11px sans-serif';
+  c.fillText(hi.toFixed(hi - lo < 10 ? 1 : 0), 4, 12);
+  c.fillText(lo.toFixed(hi - lo < 10 ? 1 : 0), 4, h - 4);
+
+  c.lineWidth = 1.4; c.lineJoin = 'round';
+  series.forEach((s, k) => {
+    if (s.length < 2) return;
+    c.strokeStyle = css(colors[k]); c.beginPath();
+    for (let i = 0; i < s.length; i++) {
+      const x = (N - s.length + i) / (N - 1) * w;
+      i ? c.lineTo(x, Y(s[i])) : c.moveTo(x, Y(s[i]));
+    }
+    c.stroke();
+  });
+}
+
+function frame() {
+  for (const id in panels) {
+    const p = panels[id];
+    if (!p.dirty) continue;
+    p.dirty = false;
+    draw(p.el.cAcc, p.hist.acc, ['--x', '--y', '--z'], 0.5, false, N_IMU);
+    draw(p.el.cGyr, p.hist.gyr, ['--x', '--y', '--z'], 40, false, N_IMU);
+    draw(p.el.cMag, p.hist.mag, ['--hit'], 100, true, N_MAG);
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+window.addEventListener('resize', () => { for (const id in panels) panels[id].dirty = true; });
+
+// ---------------- once a second: sample rate and stall check ----------------
+setInterval(() => {
+  for (const id in panels) {
+    const p = panels[id];
+    if (p.conn) {
+      const via = p.conn.kind === 'ble' ? '蓝牙' : 'USB';
+      const stalled = !p.lastDataAt || performance.now() - p.lastDataAt > 1500;
+      if (stalled) setState(p, via + '已连接，但没有数据', 'err');
+      else setState(p, via + '已连接，IMU ' + p.sampleCount + ' 点/秒', 'on');
+    }
+    p.sampleCount = 0;
+  }
+}, 1000);
+</script>
+</body>
+</html>

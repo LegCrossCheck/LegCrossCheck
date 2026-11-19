@@ -12,13 +12,22 @@ Team: Yuhao Cheng, Tong Li, Kaijia Chen.
 
 ```
 firmware/
-  node_a/      emitter ankle sketch
-  node_b/      receiver ankle sketch
-  tests/       one sketch per week-1 test
-analysis/      Python: serial logger, plots, training, tree export to C
-data/          raw CSV logs from each session
-docs/          proposal, design update, parts list
+  node_a/        current firmware, Case A (left ankle)
+  node_b/        current firmware, Case B (right ankle)
+  tests/         one sketch per week-1 test
+  experiments/   early sketches, kept for reference
+monitor/         browser dashboard for both nodes (USB serial or BLE)
+hardware/
+  schematics/    KiCad schematics (breadboard stage)
+  enclosure/     case STEP files (v9 current)
+  cad_parts/     Adafruit STEP models of the parts
+  figures/       circuit and assembly diagrams
+analysis/        Python: serial logger, plots, training, tree export to C
+data/            raw logs from each session
+docs/            proposal, design update, parts list, handoff notes (HANDOFF.md)
 ```
+
+Start with **[docs/HANDOFF.md](docs/HANDOFF.md)** for the current status, wiring, and next steps.
 
 ## Toolchain
 

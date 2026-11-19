@@ -4,3 +4,6 @@ __pycache__/
 *.pyc
 build/
 .vscode/
+*.kicad_prl
+.history/
+*-backups/

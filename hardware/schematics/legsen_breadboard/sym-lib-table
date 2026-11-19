@@ -1,0 +1,3 @@
+(sym_lib_table
+  (lib (name "CrossCheck")(type "KiCad")(uri "${KIPRJMOD}/CrossCheck.kicad_sym")(options "")(descr "CrossCheck breadboard symbols"))
+)
